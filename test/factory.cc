@@ -1,12 +1,11 @@
 #include <gtest/gtest.h>
-#include "fab/factory.h"
+#include "fab/fab.h"
 
 
 using namespace fab;
 
 /// testing
 struct Base {};
-
 struct A : public Base {};
 struct B : public Base {};
 
