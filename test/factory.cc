@@ -25,6 +25,6 @@ TEST(Factory, Base)
 
 	auto a = factory.Create("A");
 
-	ASSERT_THROW(factory.Create("A", 4), BadArguments);
-	ASSERT_THROW(factory.Create("hihi"), UnknownKey);
+	ASSERT_THROW(factory.Create("A", 4), exception::BadArguments);
+	ASSERT_THROW(factory.Create("hihi"), exception::UnknownKey);
 }
