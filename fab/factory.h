@@ -8,9 +8,9 @@
 #include <memory>
 #include <type_traits>
 
-#include "factory/exception.h"
+#include "fab/exception.h"
 
-namespace factory {
+namespace fab {
 
 template<typename Base>
 class BaseFunction
@@ -130,4 +130,4 @@ void Factory<Base, Key>::Register(
 	_map[key] = value_type (new wrapper_t(func_t(lambda)));
 }
 
-} // factory
+} // fab

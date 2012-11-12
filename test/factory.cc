@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
-#include "factory/factory.h"
+#include "fab/factory.h"
 
 
-using namespace factory;
+using namespace fab;
 
 /// testing
 struct Base {};

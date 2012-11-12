@@ -5,7 +5,7 @@
 
 #include <stdexcept>
 
-namespace factory {
+namespace fab {
 namespace exception {
 
 struct UnknownKey : public std::runtime_error
@@ -21,4 +21,4 @@ struct BadArguments : public std::runtime_error
 };
 
 } // exception
-} // factory
+} // fab

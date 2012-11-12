@@ -9,6 +9,6 @@ def configure(cfg):
 
 def build(bld):
     bld(
-        target          = 'factory',
+        target          = 'fab',
         export_includes = '.',
     )
