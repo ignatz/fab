@@ -20,10 +20,14 @@ TEST(Factory, Base)
 
 	factory.Register("A", f);
 	factory.Register("B", &createB);
-	factory.Register("narf", [](){return std::unique_ptr<Base>(new B);});
+	factory.Register("lambdaA", [](int) {
+		return std::unique_ptr<Base>(new B);
+	});
 
 	auto a = factory.Create("A");
 
 	ASSERT_THROW(factory.Create("A", 4), exception::BadArguments);
 	ASSERT_THROW(factory.Create("hihi"), exception::UnknownKey);
+
+	ASSERT_NO_THROW(factory.Create("lambdaA", 42));
 }
