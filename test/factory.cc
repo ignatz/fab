@@ -1,33 +1,64 @@
 #include <gtest/gtest.h>
 #include "fab/fab.h"
 
-
 using namespace fab;
 
 /// testing
-struct Base {};
+struct Base { virtual ~Base(){} };
 struct A : public Base {};
 struct B : public Base {};
 
-std::unique_ptr<Base> createB() { return std::unique_ptr<Base>(new B); }
+A* createA() { return new A; }
 
 TEST(Factory, Base)
 {
 	Factory<Base> factory;
 
-	std::function<std::unique_ptr<Base>()> f =
-		[](){return std::unique_ptr<Base>(new A);};
+	testing::StaticAssertTypeEq<
+		std::unique_ptr<Base>,
+		Factory<Base>::return_type>();
+
+	factory.Register("A", &createA);
+
+	auto ret = factory.Create("A");
+	auto& a  = cast<A>(ret);
+	testing::StaticAssertTypeEq<decltype(a), A&>();
+}
+
+TEST(Factory, StdFunction)
+{
+	Factory<Base> factory;
+
+	// explicit conversion to std::function
+	std::function<Base* ()> f =
+		[](){return new A;};
 
 	factory.Register("A", f);
-	factory.Register("B", &createB);
-	factory.Register("lambdaA", [](int) {
-		return std::unique_ptr<Base>(new B);
-	});
 
-	auto a = factory.Create("A");
+	ASSERT_NO_THROW(factory.Create("A"));
+}
 
-	ASSERT_THROW(factory.Create("A", 4), exception::BadArguments);
-	ASSERT_THROW(factory.Create("hihi"), exception::UnknownKey);
+TEST(Factory, Lambda)
+{
+	Factory<Base> factory;
+
+	factory.Register("lambdaA", [](int) { return new A; });
 
 	ASSERT_NO_THROW(factory.Create("lambdaA", 42));
+}
+
+TEST(Factory, DefaultDelegate)
+{
+	Factory<Base> factory;
+
+	factory.Register("B", &delegate<B>);
+	ASSERT_NO_THROW(factory.Create("B"));
+}
+
+TEST(Factory, Exception)
+{
+	Factory<Base> factory;
+	factory.Register("A", &createA);
+	ASSERT_THROW(factory.Create("A", 4), exception::BadArguments);
+	ASSERT_THROW(factory.Create("hihi"), exception::UnknownKey);
 }

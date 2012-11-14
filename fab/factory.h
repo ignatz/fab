@@ -11,13 +11,19 @@
 #include "fab/exception.h"
 #include "fab/bind.h"
 
+#define FAB_ASSERT_RETURN_TYPE(TYPE) \
+	static_assert( \
+		std::is_pointer<TYPE>::value && \
+		std::is_base_of<Base, typename std::remove_pointer<TYPE>::type>::value, \
+		"Callable needs to return Base*");
+
 namespace fab {
 
 template<typename Base>
 class BaseFunction
 {
 public:
-	typedef std::unique_ptr<Base> return_type;
+	typedef Base* return_type;
 	virtual ~BaseFunction() {}
 };
 
@@ -26,32 +32,30 @@ template<typename Base, typename ... Args>
 class Function : public BaseFunction<Base>
 {
 public:
-	typedef typename BaseFunction<Base>::return_type return_type;
-	typedef std::function<return_type (Args...)> func_t;
+	typedef std::function<
+			typename BaseFunction<Base>::return_type (Args...)
+		> function_type;
 
 	template<typename T>
 	Function(T&& func) : _func(std::forward<T>(func)) {}
 
-	return_type operator() (Args&& ... args) const
+	typename function_type::result_type
+	operator() (Args&& ... args) const
 	{
 		return _func(std::forward<Args>(args)...);
 	}
 
 protected:
-	func_t _func;
+	function_type _func;
 };
 
 
 template<typename Base, typename Key = std::string>
 struct Factory
 {
-protected:
-	typedef Key key_type;
-	typedef std::unique_ptr<BaseFunction<Base>> value_type;
-	typedef typename BaseFunction<Base>::return_type return_type;
-	std::map<key_type, value_type> _map;
-
 public:
+	typedef std::unique_ptr<Base> return_type;
+
 	template<typename ... Args>
 	return_type
 	Create(
@@ -59,28 +63,33 @@ public:
 		Args&& ... args);
 
 	/// registers lvalue std::functions
-	template<typename ... Args>
+	template<typename Return, typename ... Args>
 	void Register(
 		Key const& key,
-		std::function<return_type (Args ... args)> const& delegate);
+		std::function<Return (Args ... args)> const& delegate);
 
 	/// registers rvalue std::functions
-	template<typename ... Args>
+	template<typename Return, typename ... Args>
 	void Register(
 		Key const& key,
-		std::function<return_type (Args ... args)>&& delegate);
+		std::function<Return (Args ... args)>&& delegate);
 
 	/// registers function pointer
-	template<typename ... Args>
+	template<typename Return, typename ... Args>
 	void Register(
 		Key const& key,
-		return_type (*delegate) (Args ... args));
+		Return (*delegate) (Args ... args));
 
 	/// registers zero-argument lambdas like []() { return ...; }
 	template<typename Lambda>
 	void Register(
 		Key const& key,
 		Lambda const& lambda);
+
+protected:
+	typedef Key key_type;
+	typedef std::unique_ptr<BaseFunction<Base>> value_type;
+	std::map<key_type, value_type> _map;
 };
 
 
@@ -101,40 +110,40 @@ Factory<Base, Key>::Create(
 	try {
 		wrapper_t const& wrapper =
 			dynamic_cast<wrapper_t const&>(*(ret->second));
-		return wrapper(std::forward<Args>(args)...);
+		return return_type(wrapper(std::forward<Args>(args)...));
 	} catch (std::bad_cast& e) {
 		throw exception::BadArguments();
 	}
 }
 
 template<typename Base, typename Key>
-template<typename ... Args>
+template<typename Return, typename ... Args>
 void Factory<Base, Key>::Register(
 	Key const& key,
-	std::function<return_type (Args ... args)> const& delegate)
+	std::function<Return (Args ... args)> const& delegate)
 {
-	typedef Function<Base, Args...> wrapper_t;
-	_map[key] = value_type(new wrapper_t(delegate));
+	FAB_ASSERT_RETURN_TYPE(Return)
+	_map[key] = value_type(new Function<Base, Args...>(delegate));
 }
 
 template<typename Base, typename Key>
-template<typename ... Args>
+template<typename Return, typename ... Args>
 void Factory<Base, Key>::Register(
 	Key const& key,
-	std::function<return_type (Args ... args)>&& delegate)
+	std::function<Return (Args ... args)>&& delegate)
 {
-	typedef Function<Base, Args...> wrapper_t;
-	_map[key] = value_type(new wrapper_t(std::move(delegate)));
+	FAB_ASSERT_RETURN_TYPE(Return)
+	_map[key] = value_type(new Function<Base, Args...>(std::move(delegate)));
 }
 
 template<typename Base, typename Key>
-template<typename ... Args>
+template<typename Return, typename ... Args>
 void Factory<Base, Key>::Register(
 	Key const& key,
-	return_type (*delegate) (Args ... args))
+	Return (*delegate) (Args ... args))
 {
-	typedef Function<Base, Args...> wrapper_t;
-	_map[key] = value_type (new wrapper_t(delegate));
+	FAB_ASSERT_RETURN_TYPE(Return)
+	_map[key] = value_type (new Function<Base, Args...> (delegate));
 }
 
 template<typename Base, typename Key>
@@ -143,7 +152,9 @@ void Factory<Base, Key>::Register(
 	Key const& key,
 	Lambda const& lambda)
 {
-	Register(key, fab::bind(&Lambda::operator(), lambda));
+	auto f = fab::bind(&Lambda::operator(), lambda);
+	FAB_ASSERT_RETURN_TYPE(typename decltype(f)::result_type)
+	Register(key, std::move(f));
 }
 
 } // fab
